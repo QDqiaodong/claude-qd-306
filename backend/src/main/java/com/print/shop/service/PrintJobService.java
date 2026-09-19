@@ -24,16 +24,21 @@ public class PrintJobService {
     private final PrintJobRepository jobs;
     private final PaperRepository papers;
     private final PlateRepository plates;
+    private final TestPrintService testPrints;
 
-    public PrintJobService(PrintJobRepository jobs, PaperRepository papers, PlateRepository plates) {
+    public PrintJobService(PrintJobRepository jobs, PaperRepository papers, PlateRepository plates,
+                           TestPrintService testPrints) {
         this.jobs = jobs;
         this.papers = papers;
         this.plates = plates;
+        this.testPrints = testPrints;
     }
 
     public List<PrintJob> search(String client, String state, Long paperId,
                                  LocalDate dueFrom, LocalDate dueTo) {
-        return jobs.findAll(PrintJobSpecs.filter(client, state, paperId, dueFrom, dueTo));
+        List<PrintJob> list = jobs.findAll(PrintJobSpecs.filter(client, state, paperId, dueFrom, dueTo));
+        testPrints.markColorFlags(list);
+        return list;
     }
 
     @Transactional
@@ -90,6 +95,11 @@ public class PrintJobService {
             }
             if (to < from) {
                 throw new BizException("工单不能往回退");
+            }
+            if ("待印".equals(origin.jobState) && "印刷中".equals(next)) {
+                // 上机前最后一道关：校色通过眼下还得算数（版在机上、机在跑），
+                // 页面拦不拦另说，后台改状态一样过不了。
+                testPrints.assertPassUsable(origin.id, origin.jobNo);
             }
         }
         origin.clientName = form.clientName;

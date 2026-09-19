@@ -27,5 +27,9 @@ export const jobApi = {
   add: (b) => http.post('/jobs', b),
   save: (id, b) => http.put(`/jobs/${id}`, b)
 }
+export const testPrintApi = {
+  list: (params) => http.get('/test-prints', { params }),
+  add: (b) => http.post('/test-prints', b)
+}
 
 export default http

@@ -5,7 +5,8 @@ const routes = [
   { path: '/presses', component: () => import('../views/Presses.vue'), meta: { label: '印刷机' } },
   { path: '/plates', component: () => import('../views/Plates.vue'), meta: { label: '印版' } },
   { path: '/papers', component: () => import('../views/Papers.vue'), meta: { label: '纸张' } },
-  { path: '/jobs', component: () => import('../views/Jobs.vue'), meta: { label: '印刷工单' } }
+  { path: '/jobs', component: () => import('../views/Jobs.vue'), meta: { label: '印刷工单' } },
+  { path: '/test-prints', component: () => import('../views/TestPrints.vue'), meta: { label: '校色试印' } }
 ]
 
 export const tabs = routes.filter((r) => r.meta).map((r) => ({ path: r.path, label: r.meta.label }))

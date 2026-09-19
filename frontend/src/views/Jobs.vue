@@ -34,7 +34,7 @@
     <div class="table">
       <div class="row head-row">
         <span>工单号</span><span>客户</span><span>用纸</span><span>印版</span>
-        <span class="r">份数</span><span>交期</span><span>状态</span><span>操作</span>
+        <span class="r">份数</span><span>交期</span><span>状态</span><span>校色</span><span>操作</span>
       </div>
       <div v-for="j in items" :key="j.id" class="row">
         <span class="mono">{{ j.jobNo }}</span>
@@ -44,8 +44,11 @@
         <span class="r">{{ j.copies }}</span>
         <span class="dim">{{ j.dueDate }}</span>
         <span class="state" :class="stateTone(j.jobState)">{{ j.jobState }}</span>
+        <span><i class="ctag" :class="colorTone(j)">{{ colorText(j) }}</i></span>
         <span>
-          <button v-if="j.jobState !== '已完成'" class="ghost small" @click="advance(j)">推进</button>
+          <button v-if="showAdvance(j)" class="ghost small" @click="advance(j)">推进</button>
+          <router-link v-if="j.jobState === '待印' && !j.colorPassed"
+                       class="golink" :to="'/test-prints?jobId=' + j.id">去校色</router-link>
         </span>
       </div>
       <div v-if="!items.length" class="empty">没有符合条件的工单</div>
@@ -116,6 +119,22 @@ function plateCode(id) {
 function stateTone(s) {
   return s === '已完成' ? 'done' : s === '印刷中' ? 'doing' : ''
 }
+// 没有「通过」记录的待印单，页面上不给推进；有一条通过但已失效的，
+// 按钮留着——点了后台会按眼下的装版和机态重核，拦住并说明原因。
+function showAdvance(j) {
+  if (j.jobState === '印刷中') return true
+  return j.jobState === '待印' && !!j.colorPassed
+}
+function colorText(j) {
+  if (j.colorOk) return '已校色'
+  if (j.colorPassed) return '已失效'
+  return j.jobState === '待印' ? '未校色' : '—'
+}
+function colorTone(j) {
+  if (j.colorOk) return 'ok'
+  if (j.colorPassed) return 'stale'
+  return j.jobState === '待印' ? 'none' : 'dim'
+}
 function openNew() {
   form.value = {}
   dialog.value = true
@@ -160,7 +179,7 @@ onMounted(async () => {
 .chip i { font-style: normal; margin-left: 6px; cursor: pointer; opacity: .6; }
 .count { margin-left: auto; font-size: 12px; color: #8d92a8; }
 .table { background: #fff; border: 1px solid #e9ebf5; border-radius: 12px; overflow: hidden; }
-.row { display: grid; grid-template-columns: 110px 1.2fr 100px 100px 70px 110px 90px 80px;
+.row { display: grid; grid-template-columns: 100px 1.2fr 90px 90px 60px 100px 70px 76px 96px;
   gap: 8px; align-items: center; padding: 11px 14px; border-bottom: 1px solid #f3f4fa; font-size: 13px; }
 .head-row { background: #f7f8fc; color: #8d92a8; font-size: 12px; }
 .mono { font-family: ui-monospace, Menlo, monospace; color: #8d92a8; }
@@ -172,6 +191,13 @@ onMounted(async () => {
 .ghost { background: #fff; border: 1px solid var(--el-color-primary-light-7); color: var(--el-color-primary-dark-2);
   border-radius: 7px; padding: 6px 14px; font-size: 12px; cursor: pointer; }
 .ghost.small { padding: 4px 10px; }
+.ctag { font-style: normal; font-size: 12px; border-radius: 10px; padding: 2px 10px; }
+.ctag.ok { background: #e6f4ec; color: #2e7d4f; }
+.ctag.stale { background: #fdf0e3; color: #b4761f; }
+.ctag.none { background: #f3f4fa; color: #8d92a8; }
+.ctag.dim { color: #c6c9d8; background: none; }
+.golink { font-size: 12px; color: var(--el-color-primary-dark-2); text-decoration: none;
+  border-bottom: 1px dashed var(--el-color-primary-light-5); }
 .empty { padding: 26px; text-align: center; color: #b6bad0; font-size: 13px; }
 .fr { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
 .fr label { width: 64px; text-align: right; font-size: 13px; color: #71758c; }

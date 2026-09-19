@@ -6,6 +6,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.persistence.Transient;
 
 /** 印刷工单：客户、用哪批纸、上哪块版、印多少份。 */
 @Entity
@@ -37,4 +38,14 @@ public class PrintJob {
     /** 待印 / 印刷中 / 已完成 */
     @Column(name = "job_state", nullable = false, length = 16)
     public String jobState;
+
+    // —— 以下只是列表页显示用，不落库 ——
+
+    /** 有没有落过校色「通过」。 */
+    @Transient
+    public Boolean colorPassed;
+
+    /** 最新那条通过眼下还算不算数（版还在那台机上、机还在跑、版还在用）。 */
+    @Transient
+    public Boolean colorOk;
 }

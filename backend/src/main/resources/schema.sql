@@ -1,6 +1,7 @@
 -- 印刷厂 · 印版与工单
 SET NAMES utf8mb4;
 
+DROP TABLE IF EXISTS test_print;
 DROP TABLE IF EXISTS print_job;
 DROP TABLE IF EXISTS paper;
 DROP TABLE IF EXISTS plate;
@@ -56,6 +57,22 @@ CREATE TABLE print_job (
   KEY idx_job_paper (paper_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- 校色试印台账：一张工单 + 一块印版 + 一台印刷机，三样齐了才入账。
+-- 同一张待印单眼下只认最新一条「通过」（服务层先锁工单行再落账），旧的留档备查。
+CREATE TABLE test_print (
+  id         BIGINT       NOT NULL AUTO_INCREMENT,
+  job_id     BIGINT       NOT NULL,
+  plate_id   BIGINT       NOT NULL,
+  press_id   BIGINT       NOT NULL,
+  result     VARCHAR(8)   NOT NULL,
+  note_text  VARCHAR(200) NULL,
+  created_by VARCHAR(32)  NULL,
+  created_at DATETIME     NOT NULL,
+  PRIMARY KEY (id),
+  KEY idx_test_print_job (job_id),
+  KEY idx_test_print_result (result)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 INSERT INTO press (press_code, press_name, model_text, operator, press_state) VALUES
 ('P-01', '四色胶印机 A', 'SM102', '老陈', '运行'),
 ('P-02', '四色胶印机 B', 'SM74', '小刘', '运行'),
@@ -82,3 +99,10 @@ INSERT INTO print_job (job_no, client_name, paper_id, plate_id, copies, due_date
 ('PJ-03', '云图文化', 5, 3, 80000, '2026-09-22', '待印'),
 ('PJ-04', '光明印务', 1, 4, 20000, '2026-09-18', '已完成'),
 ('PJ-05', '凯达实业', 4, 2, 15000, '2026-09-25', '待印');
+
+-- PJ-01 校色通过后已经上机；PJ-02 有一条眼下还算数的通过（版 PL-02 在 P-01 上、机在跑）；
+-- PJ-03 试过一次没过（版已磨损）；PJ-05 还没校过色，推不动。
+INSERT INTO test_print (job_id, plate_id, press_id, result, note_text, created_by, created_at) VALUES
+(1, 1, 1, '通过', '四色对过，上的机', '老陈', '2026-09-18 10:20:00'),
+(2, 2, 1, '通过', '封面颜色对上了', '小刘', '2026-09-19 08:40:00'),
+(3, 3, 2, '不通过', '颜色偏青，版也磨了，先不修版不上机', '小刘', '2026-09-19 09:15:00');
