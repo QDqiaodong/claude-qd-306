@@ -1,0 +1,26 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:print_shop;MODE=MySQL;DB_CLOSE_DELAY=-1;LOCK_TIMEOUT=3000
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: ""
+  jpa:
+    hibernate:
+      ddl-auto: none
+    open-in-view: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.H2Dialect
+    defer-datasource-initialization: false
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath:schema-h2.sql
+  data:
+    redis:
+      host: 127.0.0.1
+      port: 6390
+
+logging:
+  level:
+    org.hibernate.SQL: warn

@@ -34,7 +34,7 @@
     <div class="table">
       <div class="row head-row">
         <span>工单号</span><span>客户</span><span>用纸</span><span>印版</span>
-        <span class="r">份数</span><span>交期</span><span>状态</span><span>操作</span>
+        <span class="r">份数</span><span>交期</span><span>已校色</span><span>状态</span><span>操作</span>
       </div>
       <div v-for="j in items" :key="j.id" class="row">
         <span class="mono">{{ j.jobNo }}</span>
@@ -43,13 +43,18 @@
         <span>{{ plateCode(j.plateId) }}</span>
         <span class="r">{{ j.copies }}</span>
         <span class="dim">{{ j.dueDate }}</span>
+        <ProofTag :p="proofOf(j.id)" />
         <span class="state" :class="stateTone(j.jobState)">{{ j.jobState }}</span>
         <span>
-          <button v-if="j.jobState !== '已完成'" class="ghost small" @click="advance(j)">推进</button>
+          <el-tooltip v-if="j.jobState === '待印' && blockReason(j)" :content="blockReason(j)" placement="top">
+            <span class="blocked-wrap"><button class="ghost small blocked" disabled>推进</button></span>
+          </el-tooltip>
+          <button v-else-if="j.jobState !== '已完成'" class="ghost small" @click="advance(j)">推进</button>
         </span>
       </div>
       <div v-if="!items.length" class="empty">没有符合条件的工单</div>
     </div>
+    <p class="tip">待印单没有眼下仍然有效的校色「通过」，推进印刷中会被后台直接挡回；去「校色试印」页落一条试印。</p>
 
     <el-dialog v-model="dialog" title="开一张工单" width="450px">
       <div class="fr"><label>工单号</label><el-input v-model="form.jobNo" /></div>
@@ -78,10 +83,10 @@
 </template>
 
 <script setup>
-import { onMounted, reactive, ref } from 'vue'
-import { ElMessage } from 'element-plus'
-import { jobApi, paperApi, plateApi } from '../api'
-import { emit } from '../utils/bus'
+import { h, onMounted, onUnmounted, reactive, ref } from 'vue'
+import { ElMessage, ElTooltip } from 'element-plus'
+import { jobApi, paperApi, plateApi, proofApi } from '../api'
+import { emit, on } from '../utils/bus'
 
 const STATES = ['待印', '印刷中', '已完成']
 const FLOW = { 待印: '印刷中', 印刷中: '已完成' }
@@ -89,9 +94,25 @@ const FLOW = { 待印: '印刷中', 印刷中: '已完成' }
 const items = ref([])
 const papers = ref([])
 const plates = ref([])
+const proofs = ref([])
 const dialog = ref(false)
 const form = ref({})
 const query = reactive({ client: '', state: '', paperId: '', dueFrom: '', dueTo: '' })
+
+// 已校色标签：有通过记录只是底子，眼下装版/机态对得上才是绿色「有效」
+const ProofTag = {
+  props: { p: { type: Object, default: null } },
+  setup(props) {
+    return () => {
+      if (!props.p) return h('span', { class: 'proof none' }, '未校色')
+      if (props.p.result !== '通过') return h('span', { class: 'proof none' }, '未通过')
+      if (props.p.validNow) return h('span', { class: 'proof ok' }, '已通过 · 有效')
+      return h(ElTooltip, { content: props.p.invalidReason, placement: 'top' }, {
+        default: () => h('span', { class: 'proof bad' }, '通过 · 已失效')
+      })
+    }
+  }
+}
 
 function params() {
   const p = {}
@@ -99,7 +120,20 @@ function params() {
   return p
 }
 async function run() {
-  items.value = await jobApi.search(params())
+  const [jobRows, proofRows] = await Promise.all([jobApi.search(params()), proofApi.list()])
+  items.value = jobRows
+  proofs.value = proofRows
+}
+function proofOf(jobId) {
+  return proofs.value.find((p) => p.jobId === jobId && p.result === '通过')
+}
+// 推进前的闸门（真拦在后台保存上，这里只负责把按钮先变灰并把原因摆出来）
+function blockReason(j) {
+  if (j.jobState !== '待印') return ''
+  const p = proofOf(j.id)
+  if (!p) return '还没有「通过」的校色试印，先去校色试印页落一条通过'
+  if (!p.validNow) return p.invalidReason
+  return ''
 }
 async function reset() {
   Object.keys(query).forEach((k) => { query[k] = '' })
@@ -143,6 +177,11 @@ onMounted(async () => {
   plates.value = await plateApi.list()
   await run()
 })
+// 印版换机器、机器停机、新落试印，都让「已校色」列和推进按钮立刻按眼下状态重算
+const off = on('data-changed', (name) => {
+  if (name === 'plate' || name === 'press' || name === 'proof') run()
+})
+onUnmounted(off)
 </script>
 
 <style scoped>
@@ -160,18 +199,24 @@ onMounted(async () => {
 .chip i { font-style: normal; margin-left: 6px; cursor: pointer; opacity: .6; }
 .count { margin-left: auto; font-size: 12px; color: #8d92a8; }
 .table { background: #fff; border: 1px solid #e9ebf5; border-radius: 12px; overflow: hidden; }
-.row { display: grid; grid-template-columns: 110px 1.2fr 100px 100px 70px 110px 90px 80px;
+.row { display: grid; grid-template-columns: 100px 1.1fr 90px 90px 64px 100px 120px 76px 76px;
   gap: 8px; align-items: center; padding: 11px 14px; border-bottom: 1px solid #f3f4fa; font-size: 13px; }
 .head-row { background: #f7f8fc; color: #8d92a8; font-size: 12px; }
 .mono { font-family: ui-monospace, Menlo, monospace; color: #8d92a8; }
 .r { text-align: right; }
 .dim { color: #8d92a8; font-size: 12px; }
+.proof { font-size: 12px; border-radius: 11px; padding: 2px 9px; white-space: nowrap; }
+.proof.ok { background: #e8f6ee; color: #2e7d4f; font-weight: 600; }
+.proof.bad { background: #fdecea; color: #c0392b; text-decoration: underline dotted; cursor: help; }
+.proof.none { color: #b6bad0; }
 .state { font-size: 12px; }
 .state.doing { color: var(--el-color-primary-dark-2); font-weight: 600; }
 .state.done { color: #2e7d4f; }
 .ghost { background: #fff; border: 1px solid var(--el-color-primary-light-7); color: var(--el-color-primary-dark-2);
   border-radius: 7px; padding: 6px 14px; font-size: 12px; cursor: pointer; }
 .ghost.small { padding: 4px 10px; }
+.ghost.blocked { color: #b6bad0; border-color: #dfe2ee; cursor: not-allowed; }
+.tip { font-size: 12px; color: #b6bad0; margin: 12px 4px 0; }
 .empty { padding: 26px; text-align: center; color: #b6bad0; font-size: 13px; }
 .fr { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
 .fr label { width: 64px; text-align: right; font-size: 13px; color: #71758c; }

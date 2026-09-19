@@ -24,11 +24,14 @@ public class PrintJobService {
     private final PrintJobRepository jobs;
     private final PaperRepository papers;
     private final PlateRepository plates;
+    private final ColorProofService proofs;
 
-    public PrintJobService(PrintJobRepository jobs, PaperRepository papers, PlateRepository plates) {
+    public PrintJobService(PrintJobRepository jobs, PaperRepository papers, PlateRepository plates,
+                           ColorProofService proofs) {
         this.jobs = jobs;
         this.papers = papers;
         this.plates = plates;
+        this.proofs = proofs;
     }
 
     public List<PrintJob> search(String client, String state, Long paperId,
@@ -90,6 +93,10 @@ public class PrintJobService {
             }
             if (to < from) {
                 throw new BizException("工单不能往回退");
+            }
+            // 待印 → 印刷中：必须有眼下仍然有效的校色试印通过，后台改状态同样走这道闸
+            if ("待印".equals(origin.jobState) && "印刷中".equals(next)) {
+                proofs.assertReadyForPress(origin.id);
             }
         }
         origin.clientName = form.clientName;
